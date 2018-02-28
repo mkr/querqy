@@ -30,29 +30,16 @@ import querqy.lucene.rewrite.SearchFieldsAndBoosting.FieldBoostModel;
 import querqy.parser.WhiteSpaceQuerqyParser;
 
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyFloat;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 public class PRMSFieldBoostTest extends LuceneTestCase {
-
-    Similarity similarity;
-
-    Similarity.SimWeight simWeight;
-
-    @Override
-    @Before
-    public void setUp() throws Exception {
-        super.setUp();
-        similarity = Mockito.mock(Similarity.class);
-        simWeight = Mockito.mock(Similarity.SimWeight.class);
-        Mockito.when(similarity.computeWeight(any(CollectionStatistics.class),  Matchers.<TermStatistics>anyVararg())).thenReturn(simWeight);
-    }
 
     @Test
     public void testGetThatFieldProbabilityRatioIsReflectedInBoost() throws Exception {
 
-        ArgumentCaptor<Float> normalizeCaptor = ArgumentCaptor.forClass(Float.class);
-        
         DocumentFrequencyCorrection dfc = new DocumentFrequencyCorrection();
 
         Directory directory = newDirectory();
@@ -68,10 +55,6 @@ public class PRMSFieldBoostTest extends LuceneTestCase {
         addNumDocs("f2", "abc", indexWriter, 4);
         addNumDocs("f2", "def", indexWriter, 2);
         indexWriter.close();
-        
-        IndexReader indexReader = DirectoryReader.open(directory); 
-        IndexSearcher indexSearcher =  new IndexSearcher(indexReader);
-        indexSearcher.setSimilarity(similarity);
         
         Map<String, Float> fields = new HashMap<>();
         fields.put("f1", 1f);
@@ -101,13 +84,22 @@ public class PRMSFieldBoostTest extends LuceneTestCase {
         
         assertNotEquals(dtq1.getTerm().field(), dtq2.getTerm().field());
 
-        final Weight weight1 = dtq1.createWeight(indexSearcher, true);
-        final Weight weight2 = dtq2.createWeight(indexSearcher, true);
-        weight1.normalize(0.1f, 5f);
-        weight2.normalize(0.1f, 5f);
+        Similarity similarity = Mockito.mock(Similarity.class);
+        Similarity.SimWeight simWeight = Mockito.mock(Similarity.SimWeight.class);
 
-        Mockito.verify(simWeight, times(2)).normalize(eq(0.1f), normalizeCaptor.capture());
-        final List<Float> capturedBoosts = normalizeCaptor.getAllValues();
+        ArgumentCaptor<Float> computeWeightBoostCaptor = ArgumentCaptor.forClass(Float.class);
+
+        Mockito.when(similarity.computeWeight(computeWeightBoostCaptor.capture(), any(CollectionStatistics.class),
+                Matchers.<TermStatistics>anyVararg())).thenReturn(simWeight);
+
+        IndexReader indexReader = DirectoryReader.open(directory);
+        IndexSearcher indexSearcher =  new IndexSearcher(indexReader);
+        indexSearcher.setSimilarity(similarity);
+
+        Weight weight1 = indexSearcher.createWeight(dtq1, true, 1.0f);
+        Weight weight2 = indexSearcher.createWeight(dtq2, true, 1.0f);
+
+        final List<Float> capturedBoosts = computeWeightBoostCaptor.getAllValues();
         float bf1 = capturedBoosts.get(0);
         float bf2 = capturedBoosts.get(1);
 
@@ -116,8 +108,6 @@ public class PRMSFieldBoostTest extends LuceneTestCase {
         indexReader.close();
         directory.close();
         analyzer.close();
-        
-        
     }
     
     public static void addNumDocs(String fieldname, String value, IndexWriter indexWriter, int num) throws IOException {

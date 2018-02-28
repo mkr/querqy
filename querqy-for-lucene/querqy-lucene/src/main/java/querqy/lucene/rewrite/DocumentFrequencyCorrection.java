@@ -4,10 +4,7 @@
 package querqy.lucene.rewrite;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
-import org.apache.lucene.index.Fields;
 import org.apache.lucene.index.IndexReaderContext;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.Term;
@@ -22,7 +19,7 @@ import org.apache.lucene.search.IndexSearcher;
  *
  */
 public class DocumentFrequencyCorrection extends AbstractDocumentFrequencyAndTermContextProvider {
-    
+
     protected TermStats doCalculateTermContexts(IndexSearcher searcher) throws IOException {
        IndexReaderContext topReaderContext = searcher.getTopReaderContext();
        
@@ -36,20 +33,17 @@ public class DocumentFrequencyCorrection extends AbstractDocumentFrequencyAndTer
            contexts[i] = new TermContext(topReaderContext);
            
            for (final LeafReaderContext ctx : topReaderContext.leaves()) {
-               final Fields fields = ctx.reader().fields();
-               if (fields != null) {
-                 final Terms terms = fields.terms(term.field());
-                 if (terms != null) {
+               final Terms terms = ctx.reader().terms(term.field());
+               if (terms != null) {
                    final TermsEnum termsEnum = terms.iterator();
-                   if (termsEnum.seekExact(term.bytes())) { 
-                     final TermState termState = termsEnum.termState();
-                     int df = termsEnum.docFreq();
-                     dfs[i] = dfs[i] + df;
-                     contexts[i].register(termState, ctx.ord, df, -1);
+                   if (termsEnum.seekExact(term.bytes())) {
+                       final TermState termState = termsEnum.termState();
+                       int df = termsEnum.docFreq();
+                       dfs[i] = dfs[i] + df;
+                       contexts[i].register(termState, ctx.ord, df, -1);
                    }
-                 }
                }
-             }
+           }
        }
        
        for (int i = 0, last = clauseOffsets.size() - 1; i <= last; i++) {

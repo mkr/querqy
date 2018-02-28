@@ -33,49 +33,34 @@ public class TermBoostQuery extends TermQuery {
     }
 
     @Override
-    public Weight createWeight(IndexSearcher searcher, boolean needsScores) throws IOException {
+    public Weight createWeight(IndexSearcher searcher, boolean needsScores, float boost) throws IOException {
         final IndexReaderContext context = searcher.getTopReaderContext();
         final TermContext termState = TermContext.build(context, term);
-        return new TermBoostWeight(termState, fieldBoost.getBoost(term.field(), searcher.getIndexReader()));
+        return new TermBoostWeight(termState, fieldBoost.getBoost(term.field(), searcher.getIndexReader()), boost);
     }
 
 
 
     class TermBoostWeight extends Weight {
         private final TermContext termStates;
-        private float unnormalizedScore;
-        private float score;
-        private float queryNorm;
-        private float queryWeight;
-        private float boost;
+        private final float unnormalizedScore;
+        private final float boost;
+        private final float score;
 
 
-        public TermBoostWeight(TermContext termStates, float unnormalizedScore)
+        public TermBoostWeight(TermContext termStates, float unnormalizedScore, float boost)
                 throws IOException {
             super(TermBoostQuery.this);
             assert termStates != null : "TermContext must not be null";
             this.termStates = termStates;
             this.unnormalizedScore = unnormalizedScore;
-            this.score = unnormalizedScore;
-            normalize(1f, 1f);
+            this.boost = boost;
+            this.score = unnormalizedScore * boost;
         }
 
         @Override
         public String toString() {
             return "weight(" + TermBoostQuery.this + ")";
-        }
-
-        @Override
-        public float getValueForNormalization() {
-            return queryWeight * queryWeight;
-        }
-
-        @Override
-        public void normalize(float queryNorm, float boost) {
-            this.boost = boost;
-            this.queryNorm = queryNorm;
-            queryWeight = queryNorm * boost * unnormalizedScore;
-            score = queryWeight;
         }
 
         @Override
@@ -116,6 +101,11 @@ public class TermBoostQuery extends TermQuery {
         }
 
         @Override
+        public boolean isCacheable(LeafReaderContext ctx) {
+            return true;
+        }
+
+        @Override
         public Explanation explain(LeafReaderContext context, int doc) throws IOException {
 
             Scorer scorer = scorer(context);
@@ -124,7 +114,6 @@ public class TermBoostQuery extends TermQuery {
                 if (newDoc == doc) {
 
                     Explanation scoreExplanation = Explanation.match(score, "product of:",
-                            Explanation.match(queryNorm, "queryNorm"),
                             Explanation.match(boost, "boost"),
                             Explanation.match(unnormalizedScore, "unnormalizedScore")
                     );
@@ -181,14 +170,7 @@ public class TermBoostQuery extends TermQuery {
         }
 
         @Override
-        public int freq() throws IOException {
-            return 1;
-        }
-
-        @Override
         public DocIdSetIterator iterator() { return postingsEnum; }
-
-
 
         @Override
         public float score() throws IOException {

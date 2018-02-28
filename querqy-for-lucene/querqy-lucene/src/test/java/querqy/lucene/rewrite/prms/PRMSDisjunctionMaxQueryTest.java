@@ -36,23 +36,22 @@ import static org.mockito.Mockito.times;
 
 public class PRMSDisjunctionMaxQueryTest extends LuceneTestCase {
 
-    Similarity similarity;
-
-    Similarity.SimWeight simWeight;
-
     @Override
     @Before
     public void setUp() throws Exception {
         super.setUp();
-        similarity = Mockito.mock(Similarity.class);
-        simWeight = Mockito.mock(Similarity.SimWeight.class);
-        Mockito.when(similarity.computeWeight(any(CollectionStatistics.class),  Matchers.<TermStatistics>anyVararg())).thenReturn(simWeight);
     }
 
     @Test
     public void testGetThatFieldProbabilityRatioIsReflectedInBoost() throws Exception {
 
-        ArgumentCaptor<Float> normalizeCaptor = ArgumentCaptor.forClass(Float.class);
+        Similarity similarity = Mockito.mock(Similarity.class);
+        Similarity.SimWeight simWeight = Mockito.mock(Similarity.SimWeight.class);
+
+        ArgumentCaptor<Float> computeWeightBoostCaptor = ArgumentCaptor.forClass(Float.class);
+
+        Mockito.when(similarity.computeWeight(computeWeightBoostCaptor.capture(), any(CollectionStatistics.class),
+                Matchers.<TermStatistics>anyVararg())).thenReturn(simWeight);
         
         DocumentFrequencyCorrection dfc = new DocumentFrequencyCorrection();
 
@@ -107,8 +106,8 @@ public class PRMSDisjunctionMaxQueryTest extends LuceneTestCase {
         
         
         indexWriter.close();
-        
-        IndexReader indexReader = DirectoryReader.open(directory); 
+
+        IndexReader indexReader = DirectoryReader.open(directory);
         IndexSearcher indexSearcher =  new IndexSearcher(indexReader);
         indexSearcher.setSimilarity(similarity);
         
@@ -123,7 +122,7 @@ public class PRMSDisjunctionMaxQueryTest extends LuceneTestCase {
         
         Query query = queryBuilder.createQuery(parser.parse("abc"));
         dfc.finishedUserQuery();
-        query.createWeight(indexSearcher, true);
+        query.createWeight(indexSearcher, true, 1f);
         
         assertTrue(query instanceof DisjunctionMaxQuery);
         
@@ -138,7 +137,6 @@ public class PRMSDisjunctionMaxQueryTest extends LuceneTestCase {
             dmq1 = ((BoostQuery) dmq1).getQuery();
         }
 
-
         Query disjunct2 = disjuncts.get(1);
         assertTrue(disjunct2 instanceof DisjunctionMaxQuery);
         Query dmq2 = disjunct2.rewrite(indexReader);
@@ -146,15 +144,10 @@ public class PRMSDisjunctionMaxQueryTest extends LuceneTestCase {
             dmq2 = ((BoostQuery) dmq2).getQuery();
         }
 
+        Weight weight1 = dmq1.createWeight(indexSearcher, true, 1f);
+        Weight weight2 = dmq2.createWeight(indexSearcher, true, 1f);
 
-        final Weight weight1 = dmq1.createWeight(indexSearcher, true);
-        weight1.normalize(0.1f, 4f);
-
-        final Weight weight2 = dmq2.createWeight(indexSearcher, true);
-        weight2.normalize(0.1f, 4f);
-        
-        Mockito.verify(simWeight, times(4)).normalize(eq(0.1f), normalizeCaptor.capture());
-        final List<Float> capturedBoosts = normalizeCaptor.getAllValues();
+        final List<Float> capturedBoosts = computeWeightBoostCaptor.getAllValues();
 
         // capturedBoosts = boosts of [dmq1.term1, dmq1.term2, dmq2.term1, dmq2.term2 ]
         assertEquals(capturedBoosts.get(0), capturedBoosts.get(1), 0.00001);

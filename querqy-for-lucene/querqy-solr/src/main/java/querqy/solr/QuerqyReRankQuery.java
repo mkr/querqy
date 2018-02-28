@@ -65,8 +65,8 @@ public class QuerqyReRankQuery extends RankQuery {
     }
 
     @Override
-    public Weight createWeight(IndexSearcher searcher, boolean needsScores) throws IOException {
-        return new ReRankWeight(mainQuery, reRankQuery, reRankWeight, searcher, needsScores);
+    public Weight createWeight(IndexSearcher searcher, boolean needsScores, float boost) throws IOException {
+        return new ReRankWeight(mainQuery, reRankQuery, reRankWeight, searcher, needsScores, boost);
     }
 
     @Override
@@ -106,13 +106,14 @@ public class QuerqyReRankQuery extends RankQuery {
         private Weight rankWeight;
         private double reRankWeight;
 
-        public ReRankWeight(Query mainQuery, Query reRankQuery, double reRankWeight, IndexSearcher searcher, boolean needsScores) throws IOException {
+        public ReRankWeight(Query mainQuery, Query reRankQuery, double reRankWeight, IndexSearcher searcher, boolean needsScores,
+                            float boost) throws IOException {
             super(mainQuery);
             this.reRankQuery = reRankQuery;
             this.searcher = searcher;
             this.reRankWeight = reRankWeight;
-            this.mainWeight = mainQuery.createWeight(searcher, needsScores);
-            this.rankWeight = reRankQuery.createWeight(searcher, true);
+            this.mainWeight = mainQuery.createWeight(searcher, needsScores, boost);
+            this.rankWeight = reRankQuery.createWeight(searcher, true, boost);
         }
 
         @Override
@@ -121,16 +122,8 @@ public class QuerqyReRankQuery extends RankQuery {
             this.rankWeight.extractTerms(terms);
         }
 
-        public float getValueForNormalization() throws IOException {
-            return mainWeight.getValueForNormalization() + rankWeight.getValueForNormalization();
-        }
-
         public Scorer scorer(LeafReaderContext context) throws IOException {
             return mainWeight.scorer(context);
-        }
-
-        public void normalize(float norm, float topLevelBoost) {
-            mainWeight.normalize(norm, topLevelBoost);
         }
 
         public Explanation explain(LeafReaderContext context, int doc) throws IOException {
@@ -145,6 +138,11 @@ public class QuerqyReRankQuery extends RankQuery {
                     return score;
                 }
             }.explain(searcher, mainExplain, context.docBase+doc);
+        }
+
+        @Override
+        public boolean isCacheable(LeafReaderContext ctx) {
+            return true;
         }
     }
 

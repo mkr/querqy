@@ -17,12 +17,10 @@ import org.apache.lucene.search.Query;
  */
 public class BooleanQueryFactory implements LuceneQueryFactory<Query> {
 
-    protected final boolean disableCoord;
     protected final LinkedList<Clause> clauses;
     protected final boolean normalizeBoost;
 
-    public BooleanQueryFactory(boolean disableCoord, boolean normalizeBoost) {
-        this.disableCoord = disableCoord;
+    public BooleanQueryFactory(boolean normalizeBoost) {
         this.normalizeBoost = normalizeBoost;
         clauses = new LinkedList<>();
     }
@@ -49,8 +47,7 @@ public class BooleanQueryFactory implements LuceneQueryFactory<Query> {
             throws IOException {
 
         BooleanQuery.Builder builder = new BooleanQuery.Builder();
-        builder.setDisableCoord(disableCoord);
-      
+
         for (Clause clause : clauses) {
             builder.add(clause.queryFactory.createQuery(boost, dmqTieBreakerMultiplier, dftcp), clause.occur);
         }

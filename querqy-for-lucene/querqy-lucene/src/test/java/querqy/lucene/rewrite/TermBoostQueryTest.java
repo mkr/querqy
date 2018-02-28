@@ -48,7 +48,7 @@ public class TermBoostQueryTest extends LuceneTestCase {
 
         final TermBoostQuery tbq = new TermBoostQuery(new Term("f1", "v1"), fieldBoost);
 
-        final Weight weight = tbq.createWeight(indexSearcher, true);
+        final Weight weight = tbq.createWeight(indexSearcher, true, 1f);
 
         assertTrue(weight instanceof TermBoostQuery.TermBoostWeight);
         final TermBoostQuery.TermBoostWeight tbw = (TermBoostQuery.TermBoostWeight) weight;
@@ -80,7 +80,7 @@ public class TermBoostQueryTest extends LuceneTestCase {
         final Set<Term> terms = new HashSet<>();
         final Term term = new Term("f1", "v1");
         new TermBoostQuery(term, new ConstantFieldBoost(1f))
-                .createWeight(indexSearcher, true)
+                .createWeight(indexSearcher, true, 1f)
                 .extractTerms(terms);
 
         assertTrue(terms.contains(term));
@@ -115,6 +115,7 @@ public class TermBoostQueryTest extends LuceneTestCase {
         indexSearcher.search(termBoostQuery, 10);
 
         verify(similarity, never()).computeWeight(
+                Matchers.anyFloat(),
                 Matchers.any(CollectionStatistics.class),
                 Matchers.<TermStatistics>anyVararg()
                 );

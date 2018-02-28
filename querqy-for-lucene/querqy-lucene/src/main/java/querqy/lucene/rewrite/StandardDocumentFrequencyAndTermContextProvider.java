@@ -25,17 +25,14 @@ public class StandardDocumentFrequencyAndTermContextProvider extends AbstractDoc
             contexts[i] = new TermContext(topReaderContext);
 
             for (final LeafReaderContext ctx : topReaderContext.leaves()) {
-                final Fields fields = ctx.reader().fields();
-                if (fields != null) {
-                    final Terms terms = fields.terms(term.field());
-                    if (terms != null) {
-                        final TermsEnum termsEnum = terms.iterator();
-                        if (termsEnum.seekExact(term.bytes())) {
-                            final TermState termState = termsEnum.termState();
-                            int df = termsEnum.docFreq();
-                            dfs[i] = dfs[i] + df;
-                            contexts[i].register(termState, ctx.ord, df, -1);
-                        }
+                final Terms terms = ctx.reader().terms(term.field());
+                if (terms != null) {
+                    final TermsEnum termsEnum = terms.iterator();
+                    if (termsEnum.seekExact(term.bytes())) {
+                        final TermState termState = termsEnum.termState();
+                        int df = termsEnum.docFreq();
+                        dfs[i] = dfs[i] + df;
+                        contexts[i].register(termState, ctx.ord, df, -1);
                     }
                 }
             }
